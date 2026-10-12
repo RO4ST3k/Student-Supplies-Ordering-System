@@ -165,6 +165,9 @@ thead th {
 td {
   font-variant-numeric: tabular-nums;
 }
+td:not(:first-child) { white-space: nowrap; }
+.table-wrapper table { min-width: 580px; }
+.receipt .table-wrapper table { min-width: 440px; }
 
 .quantity-controls {
   display: inline-flex;
@@ -247,6 +250,8 @@ dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+.totals dd { white-space: nowrap; }
+.totals div { flex-wrap: wrap; }
 
 .totals .total {
   margin-top: 8px;

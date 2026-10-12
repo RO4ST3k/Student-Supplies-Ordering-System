@@ -17,7 +17,9 @@ const get = id => document.getElementById(id);
 const money = new Intl.NumberFormat("en-PH", {
   style: "currency",
   currency: "PHP",
-  minimumFractionDigits: 2
+  currencyDisplay: "narrowSymbol",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
 });
 
 function makeButton(text, label, onClick, className = "") {
@@ -66,6 +68,10 @@ function addToCart(id) {
   const item = cart.find(item => item.id === id);
 
   if (item) {
+    if (item.quantity >= 9999) {
+      get("cart-status").textContent = "Maximum quantity is 9,999 per product.";
+      return;
+    }
     item.quantity++;
   } else {
     cart.push({ ...product, quantity: 1 });
@@ -76,8 +82,13 @@ function addToCart(id) {
 
 function changeQuantity(id, delta) {
   if (completedTransaction) return;
+  if (delta !== 1 && delta !== -1) return;
   const item = cart.find(item => item.id === id);
   if (!item) return;
+  if (delta === 1 && item.quantity >= 9999) {
+    get("cart-status").textContent = "Maximum quantity is 9,999 per product.";
+    return;
+  }
 
   item.quantity += delta;
 
@@ -183,6 +194,7 @@ function renderCart() {
 }
 
 function updateCart(message = "") {
+  clearPaymentError();
   renderCart();
 
   const count = cart.reduce(
@@ -234,9 +246,11 @@ function validatePayment(raw, badInput, totalCents, hasItems) {
   const amount = Number(raw);
   if (!Number.isFinite(amount)) return { error: "Enter a valid numeric amount." };
   if (amount < 0) return { error: "Amount paid cannot be negative." };
-  if (!/^\d+(?:\.\d{1,2})?$/.test(raw.trim())) return { error: "Enter a numeric amount with no more than two decimal places." };
-  const paidCents = Math.round(amount * 100);
-  if (!Number.isSafeInteger(paidCents)) return { error: "The amount entered is too large." };
+  if (!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(raw.trim())) return { error: "Enter a numeric amount with no more than two decimal places." };
+  const [whole, fraction = ""] = raw.trim().split(".");
+  const cents = BigInt(whole || "0") * 100n + BigInt(fraction.padEnd(2, "0"));
+  if (cents > BigInt(Number.MAX_SAFE_INTEGER)) return { error: "The amount entered is too large." };
+  const paidCents = Number(cents);
   if (paidCents < totalCents) return { error: `Amount paid must be at least ${money.format(totalCents / 100)}.` };
   return { paidCents };
 }
@@ -247,6 +261,15 @@ function setTransactionLocked(locked) {
   });
   get("amount-paid").disabled = locked;
   get("confirm-payment").disabled = locked;
+  get("payment-form").hidden = locked;
+  get("payment-complete").hidden = !locked;
+}
+
+function transactionReference() {
+  if (globalThis.crypto?.randomUUID) return `TXN-${crypto.randomUUID().toUpperCase()}`;
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return `TXN-${Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }
 
 function confirmPayment(event) {
@@ -261,7 +284,7 @@ function confirmPayment(event) {
     return;
   }
   completedTransaction = {
-    reference: `TXN-${crypto.randomUUID().toUpperCase()}`,
+    reference: transactionReference(),
     date: new Date(),
     items: cart.map(item => ({ ...item })),
     totalCents,
@@ -314,3 +337,4 @@ function newTransaction() {
 get("payment-form").addEventListener("submit", confirmPayment);
 get("amount-paid").addEventListener("input", clearPaymentError);
 get("new-transaction").addEventListener("click", newTransaction);
+get("receipt-new-transaction").addEventListener("click", newTransaction);
