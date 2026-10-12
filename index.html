@@ -99,33 +99,39 @@
     <section class="panel payment" aria-labelledby="payment-heading">
       <h2 id="payment-heading">Payment Section</h2>
 
-      <!-- Add payment method selection and checkout integration here. -->
-      <p class="section-description">
-        Choose a payment method to complete your order.
-      </p>
-
-      <div id="payment-options" class="placeholder">
-        Payment options will appear here.
-      </div>
-
-      <button id="place-order" type="button" disabled>Place order</button>
-
-      <p class="helper">
-        Checkout will be available once payment is configured.
-      </p>
+      <p class="section-description">Enter the cash amount received to complete this order.</p>
+      <form id="payment-form" novalidate>
+        <label for="amount-paid">Amount Paid (₱)</label>
+        <input id="amount-paid" name="amount-paid" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="payment-error" placeholder="0.00">
+        <p id="payment-error" class="payment-error" role="alert" hidden></p>
+        <button id="confirm-payment" type="submit">Confirm Payment</button>
+      </form>
+      <button id="new-transaction" class="secondary-button" type="button">New Transaction</button>
     </section>
 
-    <section class="panel receipt" aria-labelledby="receipt-heading">
+    <section id="receipt-section" class="panel receipt" aria-labelledby="receipt-heading" hidden>
       <div class="section-header">
-        <h2 id="receipt-heading">Receipt Section</h2>
+        <h2 id="receipt-heading" tabindex="-1">Digital Receipt</h2>
         <span class="badge">Confirmation</span>
       </div>
 
-      <!-- Render the order number, purchased items, and payment details here. -->
-      <div id="receipt-content" class="empty-state" aria-live="polite">
-        <h3>A record of your order</h3>
-        <p>Your receipt will appear here after checkout.</p>
+      <p class="success-message" role="status">Payment successful! Thank you for your purchase.</p>
+      <dl class="receipt-meta">
+        <div><dt>Transaction Reference Number</dt><dd id="receipt-reference"></dd></div>
+        <div><dt>Date &amp; Time</dt><dd id="receipt-date"></dd></div>
+      </dl>
+      <div class="table-wrapper" tabindex="0" role="region" aria-label="Purchased items">
+        <table>
+          <caption class="visually-hidden">Items purchased</caption>
+          <thead><tr><th scope="col">Product Name</th><th scope="col">Quantity</th><th scope="col">Unit Price</th><th scope="col">Subtotal</th></tr></thead>
+          <tbody id="receipt-items"></tbody>
+        </table>
       </div>
+      <dl class="totals">
+        <div><dt>Total Amount Due</dt><dd id="receipt-total"></dd></div>
+        <div><dt>Amount Paid</dt><dd id="receipt-paid"></dd></div>
+        <div class="total"><dt>Change</dt><dd id="receipt-change"></dd></div>
+      </dl>
     </section>
   </main>
 

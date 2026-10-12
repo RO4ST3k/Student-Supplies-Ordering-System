@@ -10,6 +10,7 @@ const products = [
 ];
 
 const cart = [];
+let completedTransaction = null;
 
 const get = id => document.getElementById(id);
 
@@ -58,6 +59,7 @@ function renderProducts() {
 }
 
 function addToCart(id) {
+  if (completedTransaction) return;
   const product = products.find(product => product.id === id);
   if (!product) return;
 
@@ -73,6 +75,7 @@ function addToCart(id) {
 }
 
 function changeQuantity(id, delta) {
+  if (completedTransaction) return;
   const item = cart.find(item => item.id === id);
   if (!item) return;
 
@@ -88,6 +91,7 @@ function changeQuantity(id, delta) {
 }
 
 function removeFromCart(id) {
+  if (completedTransaction) return;
   const index = cart.findIndex(item => item.id === id);
   if (index < 0) return;
 
@@ -206,3 +210,107 @@ function updateCart(message = "") {
 
 renderProducts();
 updateCart();
+
+function clearPaymentError() {
+  get("payment-error").textContent = "";
+  get("payment-error").hidden = true;
+  get("amount-paid").removeAttribute("aria-invalid");
+}
+
+function paymentError(message, invalidInput = true) {
+  get("payment-error").textContent = message;
+  get("payment-error").hidden = false;
+  if (invalidInput) {
+    get("amount-paid").setAttribute("aria-invalid", "true");
+    get("amount-paid").focus();
+  }
+}
+
+// Use integer centavos to avoid floating-point change errors.
+function validatePayment(raw, badInput, totalCents, hasItems) {
+  if (!hasItems) return { error: "Your cart is empty. Add supplies before paying.", invalidInput: false };
+  if (badInput) return { error: "Enter a valid numeric amount." };
+  if (!raw.trim()) return { error: "Enter the amount paid." };
+  const amount = Number(raw);
+  if (!Number.isFinite(amount)) return { error: "Enter a valid numeric amount." };
+  if (amount < 0) return { error: "Amount paid cannot be negative." };
+  if (!/^\d+(?:\.\d{1,2})?$/.test(raw.trim())) return { error: "Enter a numeric amount with no more than two decimal places." };
+  const paidCents = Math.round(amount * 100);
+  if (!Number.isSafeInteger(paidCents)) return { error: "The amount entered is too large." };
+  if (paidCents < totalCents) return { error: `Amount paid must be at least ${money.format(totalCents / 100)}.` };
+  return { paidCents };
+}
+
+function setTransactionLocked(locked) {
+  document.querySelectorAll(".product-card button, #cart-items button").forEach(button => {
+    button.disabled = locked;
+  });
+  get("amount-paid").disabled = locked;
+  get("confirm-payment").disabled = locked;
+}
+
+function confirmPayment(event) {
+  event.preventDefault();
+  if (completedTransaction) return;
+  clearPaymentError();
+  const totalCents = cart.reduce((sum, item) => sum + Math.round(item.price * 100) * item.quantity, 0);
+  const input = get("amount-paid");
+  const result = validatePayment(input.value, input.validity.badInput, totalCents, cart.length > 0);
+  if (result.error) {
+    paymentError(result.error, result.invalidInput !== false);
+    return;
+  }
+  completedTransaction = {
+    reference: `TXN-${crypto.randomUUID().toUpperCase()}`,
+    date: new Date(),
+    items: cart.map(item => ({ ...item })),
+    totalCents,
+    paidCents: result.paidCents,
+    changeCents: result.paidCents - totalCents
+  };
+  renderReceipt(completedTransaction);
+  setTransactionLocked(true);
+  get("receipt-section").hidden = false;
+  get("receipt-heading").focus();
+}
+
+function renderReceipt(transaction) {
+  get("receipt-reference").textContent = transaction.reference;
+  get("receipt-date").textContent = new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium", timeStyle: "long", timeZone: "Asia/Shanghai"
+  }).format(transaction.date);
+  get("receipt-items").replaceChildren();
+  transaction.items.forEach(item => {
+    const row = document.createElement("tr");
+    [item.name, item.quantity, money.format(item.price), money.format(item.price * item.quantity)].forEach((value, index) => {
+      const cell = document.createElement(index === 0 ? "th" : "td");
+      if (index === 0) cell.scope = "row";
+      cell.textContent = value;
+      row.append(cell);
+    });
+    get("receipt-items").append(row);
+  });
+  get("receipt-total").textContent = money.format(transaction.totalCents / 100);
+  get("receipt-paid").textContent = money.format(transaction.paidCents / 100);
+  get("receipt-change").textContent = money.format(transaction.changeCents / 100);
+}
+
+function newTransaction() {
+  completedTransaction = null;
+  cart.length = 0;
+  get("payment-form").reset();
+  clearPaymentError();
+  get("cart-status").textContent = "";
+  get("receipt-section").hidden = true;
+  get("receipt-items").replaceChildren();
+  ["receipt-reference", "receipt-date", "receipt-total", "receipt-paid", "receipt-change"].forEach(id => {
+    get(id).textContent = "";
+  });
+  updateCart();
+  setTransactionLocked(false);
+  get("amount-paid").focus();
+}
+
+get("payment-form").addEventListener("submit", confirmPayment);
+get("amount-paid").addEventListener("input", clearPaymentError);
+get("new-transaction").addEventListener("click", newTransaction);
