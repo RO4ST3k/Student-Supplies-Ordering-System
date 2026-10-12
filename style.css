@@ -68,7 +68,7 @@ h3 {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
 
@@ -134,13 +134,73 @@ button:not(:disabled):hover {
   background: #19503f;
 }
 
-.cart-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 0;
+.products,
+.cart {
+  grid-column: 1 / -1;
+}
+
+.table-wrapper {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
   text-align: left;
   font-size: 0.875rem;
+}
+
+th,
+td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+thead th {
+  color: var(--muted);
+  background: #fafcfc;
+}
+
+td {
+  font-variant-numeric: tabular-nums;
+}
+
+.quantity-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.quantity-button {
+  width: 44px;
+  padding: 8px;
+}
+
+.remove-button {
+  width: auto;
+  background: #a52d2d;
+}
+
+.remove-button:not(:disabled):hover {
+  background: #802222;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 @media (min-width: 701px) and (max-width: 1000px) {

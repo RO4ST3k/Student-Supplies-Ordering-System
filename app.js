@@ -1,45 +1,38 @@
 "use strict";
 
-// Local inventory: no database or network connection is required.
 const products = [
   { id: 1, name: "Ballpen", price: 12 },
   { id: 2, name: "Pencil", price: 10 },
   { id: 3, name: "Notebook", price: 35 },
   { id: 4, name: "Yellow Pad", price: 45 },
   { id: 5, name: "Eraser", price: 8 },
-  { id: 6, name: "Ruler", price: 15 },
+  { id: 6, name: "Ruler", price: 15 }
 ];
 
-const state = {
-  products,
-  cart: [],
-  order: null,
-};
+const cart = [];
 
-// The script is deferred, so these elements are available when it runs.
-const elements = {
-  productList: document.getElementById("product-list"),
-  cartItems: document.getElementById("cart-items"),
-  cartCount: document.getElementById("cart-count"),
-  subtotal: document.getElementById("subtotal"),
-  charges: document.getElementById("charges"),
-  orderTotal: document.getElementById("order-total"),
-  paymentOptions: document.getElementById("payment-options"),
-  placeOrder: document.getElementById("place-order"),
-  receiptContent: document.getElementById("receipt-content"),
-};
+const get = id => document.getElementById(id);
 
-const pesoFormatter = new Intl.NumberFormat("en-PH", {
+const money = new Intl.NumberFormat("en-PH", {
   style: "currency",
   currency: "PHP",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: 2
 });
 
-function renderProducts() {
-  elements.productList.replaceChildren();
+function makeButton(text, label, onClick, className = "") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = text;
+  button.className = className;
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", onClick);
+  return button;
+}
 
-  for (const product of state.products) {
+function renderProducts() {
+  get("product-list").replaceChildren();
+
+  products.forEach(product => {
     const card = document.createElement("article");
     card.className = "product-card";
 
@@ -48,63 +41,168 @@ function renderProducts() {
 
     const price = document.createElement("p");
     price.className = "product-price";
-    price.textContent = pesoFormatter.format(product.price);
+    price.textContent = money.format(product.price);
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "Add to Cart";
-    button.setAttribute("aria-label", `Add ${product.name} to cart`);
-    button.addEventListener("click", () => addToCart(product));
+    card.append(
+      name,
+      price,
+      makeButton(
+        "Add to Cart",
+        `Add ${product.name} to cart`,
+        () => addToCart(product.id)
+      )
+    );
 
-    card.append(name, price, button);
-    elements.productList.append(card);
+    get("product-list").append(card);
+  });
+}
+
+function addToCart(id) {
+  const product = products.find(product => product.id === id);
+  if (!product) return;
+
+  const item = cart.find(item => item.id === id);
+
+  if (item) {
+    item.quantity++;
+  } else {
+    cart.push({ ...product, quantity: 1 });
+  }
+
+  updateCart(`${product.name} added to cart.`);
+}
+
+function changeQuantity(id, delta) {
+  const item = cart.find(item => item.id === id);
+  if (!item) return;
+
+  item.quantity += delta;
+
+  // Decreasing a quantity of one removes the item.
+  if (item.quantity < 1) {
+    removeFromCart(id);
+    return;
+  }
+
+  updateCart(`${item.name} quantity updated.`);
+}
+
+function removeFromCart(id) {
+  const index = cart.findIndex(item => item.id === id);
+  if (index < 0) return;
+
+  const [item] = cart.splice(index, 1);
+  updateCart(`${item.name} removed from cart.`);
+}
+
+function renderCart() {
+  const focused = document.activeElement;
+  const focusId = focused?.dataset.productId;
+  const focusAction = focused?.dataset.action;
+
+  get("cart-items").replaceChildren();
+  get("cart-empty").hidden = cart.length > 0;
+  get("cart-table-wrapper").hidden = cart.length === 0;
+
+  cart.forEach(item => {
+    const row = document.createElement("tr");
+
+    const name = document.createElement("th");
+    name.scope = "row";
+    name.textContent = item.name;
+
+    const price = document.createElement("td");
+    price.textContent = money.format(item.price);
+
+    const quantity = document.createElement("td");
+    const controls = document.createElement("div");
+    controls.className = "quantity-controls";
+
+    const minus = makeButton(
+      "−",
+      `Decrease ${item.name} quantity`,
+      () => changeQuantity(item.id, -1),
+      "quantity-button"
+    );
+
+    const plus = makeButton(
+      "+",
+      `Increase ${item.name} quantity`,
+      () => changeQuantity(item.id, 1),
+      "quantity-button"
+    );
+
+    const value = document.createElement("span");
+    value.textContent = item.quantity;
+
+    controls.append(minus, value, plus);
+    quantity.append(controls);
+
+    const subtotal = document.createElement("td");
+    subtotal.textContent = money.format(item.price * item.quantity);
+
+    const actions = document.createElement("td");
+
+    const remove = makeButton(
+      "Remove",
+      `Remove ${item.name} from cart`,
+      () => removeFromCart(item.id),
+      "remove-button"
+    );
+
+    [minus, plus, remove].forEach((button, index) => {
+      button.dataset.productId = item.id;
+      button.dataset.action = ["decrease", "increase", "remove"][index];
+    });
+
+    actions.append(remove);
+    row.append(name, price, quantity, subtotal, actions);
+    get("cart-items").append(row);
+  });
+
+  // Restore keyboard focus after rebuilding the cart rows.
+  if (focusId) {
+    const buttons = [...get("cart-items").querySelectorAll("button")];
+
+    const match = buttons.find(
+      button =>
+        button.dataset.productId === focusId &&
+        button.dataset.action === focusAction
+    );
+
+    (
+      match ||
+      buttons[0] ||
+      get("product-list").querySelector("button")
+    )?.focus();
   }
 }
 
-function addToCart(product) {
-  const existing = state.cart.find(item => item.id === product.id);
+function updateCart(message = "") {
+  renderCart();
 
-  if (existing) {
-    existing.quantity += 1;
-  } else {
-    state.cart.push({ ...product, quantity: 1 });
-  }
+  const count = cart.reduce(
+    (sum, item) => sum + item.quantity,
+    0
+  );
 
-  elements.cartItems.replaceChildren();
+  const total = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
 
-  let count = 0;
-  let subtotal = 0;
-
-  for (const item of state.cart) {
-    count += item.quantity;
-    subtotal += item.price * item.quantity;
-
-    const row = document.createElement("div");
-    row.className = "cart-line";
-
-    const label = document.createElement("span");
-    label.textContent = `${item.name} × ${item.quantity}`;
-
-    const amount = document.createElement("span");
-    amount.textContent = pesoFormatter.format(item.price * item.quantity);
-
-    row.append(label, amount);
-    elements.cartItems.append(row);
-  }
-
-  elements.cartCount.textContent =
+  get("cart-count").textContent =
     `${count} ${count === 1 ? "item" : "items"}`;
 
-  elements.subtotal.textContent = pesoFormatter.format(subtotal);
-  elements.charges.textContent = pesoFormatter.format(0);
-  elements.orderTotal.textContent = pesoFormatter.format(subtotal);
+  get("subtotal").textContent = money.format(total);
+  get("charges").textContent = money.format(0);
+  get("order-total").textContent = money.format(total);
+
+  if (message) {
+    get("cart-status").textContent =
+      `${message} Total ${money.format(total)}.`;
+  }
 }
 
-function init() {
-  renderProducts();
-
-  // TODO: Configure payment before enabling the Place order button.
-  // TODO: Render a receipt after a successful order.
-}
-
-init();
+renderProducts();
+updateCart();
